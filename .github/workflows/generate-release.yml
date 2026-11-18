@@ -1,0 +1,118 @@
+name: Generate Release
+
+# Makefile mapping (bump-my-version tag v{version}):
+#   stable X.Y.Z  → this workflow (published release, then Docker Hub and GHCR)
+#   X.Y.Z-rcN     → generate-test-release.yml (prerelease, images built, not pushed)
+#   X.Y.Z-devN    → no release workflow
+#   X.Y.Z-draftN  → generate-draft-release.yml (GitHub draft; not from Make)
+#
+# Docker Hub uses DOCKERHUB_USERNAME (the Docker ID) and DOCKERHUB_TOKEN
+# (a Repo Read & Write access token). GHCR uses GITHUB_TOKEN.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - '!v[0-9]+.[0-9]+.[0-9]+-dev[0-9]+'
+      - '!v[0-9]+.[0-9]+.[0-9]+-draft[0-9]+'
+      - '!v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: write
+  packages: write
+
+jobs:
+  generate-release-notes:
+    name: Generate Release Notes
+    uses: the-lupaxa-project/workflows/.github/workflows/reusable-github-release-generator.yml@master
+    with:
+      draft: false
+      prerelease: false
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  verify-docker-hub:
+    name: Verify Docker Hub Login
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [[ -z "${DOCKERHUB_USERNAME}" || -z "${DOCKERHUB_TOKEN}" ]]; then
+            echo "Set DOCKERHUB_USERNAME and DOCKERHUB_TOKEN on this repository." >&2
+            exit 1
+          fi
+          printf '%s\n' "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+
+  publish-images:
+    name: Publish ${{ matrix.family }}
+    needs:
+      - verify-docker-hub
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        family:
+          - almalinux
+          - alpine
+          - amazonlinux
+          - archlinux
+          - centos
+          - debian
+          - oraclelinux
+          - photon
+          - rockylinux
+          - ubuntu
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          printf '%s\n' "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+
+      - name: Generate, build, and publish to Docker Hub
+        run: |
+          cd "Dockerfiles/${{ matrix.family }}"
+          ./manage-all.sh --generate --build --publish
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s\n' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+
+      - name: Publish to GHCR
+        run: |
+          cd "Dockerfiles/${{ matrix.family }}"
+          ./manage-all.sh --publish --ghcr
+
+  generate-workflow-summary:
+    name: Generate Workflow Summary
+    needs:
+      - generate-release-notes
+      - publish-images
+    if: always()
+    uses: the-lupaxa-project/workflows/.github/workflows/reusable-workflow-summary.yml@master
+
+  generate-workflow-notifications:
+    name: Generate Workflow Notifications
+    needs:
+      - generate-workflow-summary
+    if: always()
+    uses: the-lupaxa-project/workflows/.github/workflows/reusable-workflow-notifier.yml@master
+    with:
+      notify_on_results: "failure,timed_out"
+    secrets:
+      slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

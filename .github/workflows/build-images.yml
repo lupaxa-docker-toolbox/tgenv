@@ -1,0 +1,109 @@
+name: Build Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      family:
+        description: Image family to build, or all
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - almalinux
+          - alpine
+          - amazonlinux
+          - archlinux
+          - centos
+          - debian
+          - oraclelinux
+          - photon
+          - rockylinux
+          - ubuntu
+
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/build-images.yml
+      - Config/**
+      - Dockerfiles/**
+      - Scripts/**
+      - Templates/**
+      - manage-all.sh
+
+  pull_request:
+    branches:
+      - master
+    paths:
+      - .github/workflows/build-images.yml
+      - Config/**
+      - Dockerfiles/**
+      - Scripts/**
+      - Templates/**
+      - manage-all.sh
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  select-families:
+    name: Select Families
+    runs-on: ubuntu-latest
+    outputs:
+      families: ${{ steps.set.outputs.families }}
+    steps:
+      - name: Select families
+        id: set
+        env:
+          FAMILY: ${{ github.event.inputs.family }}
+        run: |
+          all='["almalinux","alpine","amazonlinux","archlinux","centos","debian","oraclelinux","photon","rockylinux","ubuntu"]'
+          if [[ -z "${FAMILY}" || "${FAMILY}" == "all" ]]; then
+            echo "families=${all}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "families=[\"${FAMILY}\"]" >> "${GITHUB_OUTPUT}"
+          fi
+
+  build-images:
+    name: Build ${{ matrix.family }}
+    needs:
+      - select-families
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        family: ${{ fromJson(needs.select-families.outputs.families) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Generate and build
+        run: |
+          cd "Dockerfiles/${{ matrix.family }}"
+          ./manage-all.sh --generate --build
+
+  generate-workflow-summary:
+    name: Generate Workflow Summary
+    needs:
+      - build-images
+    if: always()
+    uses: the-lupaxa-project/workflows/.github/workflows/reusable-workflow-summary.yml@master
+
+  generate-workflow-notifications:
+    name: Generate Workflow Notifications
+    needs:
+      - generate-workflow-summary
+    if: always()
+    uses: the-lupaxa-project/workflows/.github/workflows/reusable-workflow-notifier.yml@master
+    with:
+      notify_on_results: "failure,timed_out"
+    secrets:
+      slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
