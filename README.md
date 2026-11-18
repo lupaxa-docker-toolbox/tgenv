@@ -23,12 +23,15 @@ Docker and Python 3. Version Helper runs inside the base image while generating,
 From the repository root, a family directory, or a version directory:
 
 ```shell
+./manage-all.sh --sync
 ./manage-all.sh --generate
 ./manage-all.sh --build
 ./manage-all.sh --generate --build --clean
 ./manage-all.sh --publish
 ./manage-all.sh --publish --ghcr
 ```
+
+`--sync` downloads the version catalogue from Container Framework and rewrites the version directories for the families in `Config/os.cfg`.
 
 A version directory has `manage.sh` instead of `manage-all.sh`. The flags are the same. The newest version of a family also publishes `latest`.
 
