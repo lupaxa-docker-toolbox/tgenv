@@ -82,21 +82,34 @@ jobs:
         run: |
           printf '%s\n' "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
 
-      - name: Generate, build, and publish to Docker Hub
+      - name: Generate and build
         run: |
           cd "Dockerfiles/${{ matrix.family }}"
-          ./manage-all.sh --generate --build --publish
+          ./manage-all.sh --generate --build
+
+      - name: Publish to Docker Hub
+        id: dockerhub
+        continue-on-error: true
+        run: |
+          cd "Dockerfiles/${{ matrix.family }}"
+          ./manage-all.sh --publish
 
       - name: Log in to GHCR
+        if: steps.dockerhub.outcome == 'success' || steps.dockerhub.outcome == 'failure'
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           printf '%s\n' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
       - name: Publish to GHCR
+        if: steps.dockerhub.outcome == 'success' || steps.dockerhub.outcome == 'failure'
         run: |
           cd "Dockerfiles/${{ matrix.family }}"
           ./manage-all.sh --publish --ghcr
+
+      - name: Docker Hub publish failed
+        if: always() && steps.dockerhub.outcome == 'failure'
+        run: exit 1
 
   generate-workflow-summary:
     name: Generate Workflow Summary
