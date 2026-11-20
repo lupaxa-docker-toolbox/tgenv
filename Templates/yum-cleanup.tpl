@@ -3,4 +3,8 @@
 #		&& \
 	yum autoremove -y && \
 	yum clean all && \
-	rm -rf /var/cache/yum
+	rm -rf \
+		/var/cache/yum \
+		/var/log/yum.log \
+		/tmp/* \
+		/var/tmp/*

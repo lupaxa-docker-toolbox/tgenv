@@ -8,7 +8,7 @@
 
 Tgenv is a set of images with [tgenv](https://github.com/tgenv/tgenv) installed. Each image can install and switch Terragrunt versions.
 
-The supported tags are the releases still in the vendor's own security support, the same set [Container Framework](https://github.com/lupaxa-docker-toolbox/container-framework) builds.
+These images build Alpine, CentOS Stream, Debian, and Ubuntu. The tags are the releases still in the vendor's own security support, taken from the [Container Framework](https://github.com/lupaxa-docker-toolbox/container-framework) catalogue.
 
 Debian and Ubuntu also publish the codename. The newest tag of each family is `latest`.
 

@@ -35,15 +35,9 @@ jobs:
       fail-fast: false
       matrix:
         family:
-          - almalinux
           - alpine
-          - amazonlinux
-          - archlinux
           - centos
           - debian
-          - oraclelinux
-          - photon
-          - rockylinux
           - ubuntu
     steps:
       - name: Checkout

@@ -1,1 +1,0 @@
-../../../../Templates/pacman-cleanup.tpl

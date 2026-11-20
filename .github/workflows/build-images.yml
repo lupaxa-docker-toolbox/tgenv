@@ -10,15 +10,9 @@ on:
         type: choice
         options:
           - all
-          - almalinux
           - alpine
-          - amazonlinux
-          - archlinux
           - centos
           - debian
-          - oraclelinux
-          - photon
-          - rockylinux
           - ubuntu
 
   push:
@@ -64,7 +58,7 @@ jobs:
         env:
           FAMILY: ${{ github.event.inputs.family }}
         run: |
-          all='["almalinux","alpine","amazonlinux","archlinux","centos","debian","oraclelinux","photon","rockylinux","ubuntu"]'
+          all='["alpine","centos","debian","ubuntu"]'
           if [[ -z "${FAMILY}" || "${FAMILY}" == "all" ]]; then
             echo "families=${all}" >> "${GITHUB_OUTPUT}"
           else

@@ -1,1 +1,0 @@
-../../../../Templates/dnf-cleanup.tpl
